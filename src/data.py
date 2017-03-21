@@ -19,5 +19,3 @@ def get_data():
         friend_timeline = api.GetUserTimeline(user_id=friend_id, count=200)
         for tweet in friend_timeline:
             save_data()
-
-    
