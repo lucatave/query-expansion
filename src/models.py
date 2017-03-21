@@ -32,15 +32,24 @@ class Annotation(BaseModel):
 
 
 class Tweet(BaseModel):
-    user_w = ForeignKeyField(User, related_name="posted")
-    user_r = ForeignKeyField(User, related_name="received")
-    id_document = ForeignKeyField(Document, related_name="tweet")
-    annotation = ForeignKeyField(Annotation, related_name="tweets")
+    user_w = ForeignKeyField(User, on_delete="CASCADE",
+                             related_name="posted")
+    user_r = ForeignKeyField(User, on_delete="CASCADE",
+                             related_name="received")
+    id_document = ForeignKeyField(Document, on_delete="CASCADE",
+                                  related_name="tweet")
+    annotation = ForeignKeyField(Annotation, on_delete="CASCADE",
+                                 related_name="tweets")
+
+    class Meta:
+        indexes = (
+            (('user_w', 'user_r', 'id_document', 'annotation'), True)
+        )
 
 
 class AnnotationSimilarity(BaseModel):
-    annotation1 = ForeignKeyField(Annotation)
-    annotation2 = ForeignKeyField(Annotation)
+    annotation1 = ForeignKeyField(Annotation, on_delete="CASCADE")
+    annotation2 = ForeignKeyField(Annotation, on_delete="CASCADE")
     rank = DoubleField()
 
     class Meta:
