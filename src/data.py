@@ -1,8 +1,10 @@
 from os import environ
 from twitter import Api
 
+
 def save_data():
     pass
+
 
 def get_data():
     cons_key = environ["TWITTER_CONSUMER_KEY"]

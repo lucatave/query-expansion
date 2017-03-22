@@ -2,18 +2,17 @@ from peewee import (DoubleField, TextField,
                     ForeignKeyField, CompositeKey,
                     Model)
 
-from playhouse.db_url import connect
+from playhouse.postgres_ext import PostgresqlDatabase
 from os import environ
-
-
-def get_url() -> str:
-    url = environ["TQE_DB_URL"]
-    return url
 
 
 class BaseModel(Model):
     class Meta:
-        database = connect(get_url())
+        database = PostgresqlDatabase(environ["POSTGRES_DB"],
+                                      user=environ["POSTGRES_USER"],
+                                      password=environ["POSTGRES_PASSWORD"],
+                                      host=environ["DB_HOST"],
+                                      port=environ["DB_PORT"])
 
 
 class User(BaseModel):
