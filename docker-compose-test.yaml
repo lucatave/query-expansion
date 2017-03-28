@@ -8,4 +8,6 @@ services:
     build: .
     links:
       - db_test
-    command: python -m unittest
+    working_dir: /app/src/
+    command: python data.py
+    env_file: .env
