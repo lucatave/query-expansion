@@ -1,8 +1,12 @@
+from typing import Dict, Tuple, Set
 from os import environ
 from twitter import Api
 from peewee import OperationalError
 from models import (User, Document, Annotation, Tweet,
-                    AnnotationSimilarity, db)
+                    AnnotationSimilarity, BaseModel, db)
+from nltk import work_tokenize, download
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
 from os.path import join, dirname
 from dotenv import load_dotenv
 
@@ -20,6 +24,25 @@ def print_info(tweet):
     print("\n")
 
 
+def update_many(entity: BaseModel, data: Dict[str, float]):
+    for (k, v) in data:
+        entity.update(rank=data[k]).where(id=k)
+
+
+def get_user_rank(user_id: str) -> float:
+    return float(User.select(User.rank).where(User.id == user_id))
+
+
+def get_term_user_times(term: str, user: str) -> int:
+    docs = Document(Tweet.select(Tweet.id_document).where(
+        Tweet.id_annotation == term))
+    count = 0
+    for doc in docs:
+        if doc.user_r == user or doc.user_w == user:
+            count += 1
+    return count
+
+
 def wait_for_db():
     flag = True
     while flag:
@@ -28,12 +51,39 @@ def wait_for_db():
             flag = False
         except OperationalError:
             flag = True
+    return db
+
+
+def close_connection():
+    db.close()
 
 
 def create_db():
-    wait_for_db()
     db.create_tables([User, Document, Annotation,
                       Tweet, AnnotationSimilarity])
+
+
+def normalize_data(text: str, user_r: str=None) -> Set[str]:
+    wnl = WordNetLemmatizer()
+    seng = stopwords.words("english")
+    sita = stopwords.words("italian")
+    if sita is None or seng is None:
+        download()
+
+
+def get_aa_subset(query: str) -> Dict[Tuple[str, str], float]:
+    normalize_data(query)
+    key_subset = []
+    for annotation in annotations:
+        key_contains()
+
+def key_contains(keys, key, ret=[]):
+    for k in keys:
+        if k[0] == key:
+            ret.add(k[1])
+        elif k[1] == key:
+            ret.add(k[0])
+    return ret
 
 
 def save_data(tweet, u_r, u_w):
