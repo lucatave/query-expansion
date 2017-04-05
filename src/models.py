@@ -28,6 +28,7 @@ class Document(BaseModel):
                              related_name="posted")
     user_r = ForeignKeyField(User, on_delete="CASCADE",
                              related_name="received")
+    language = TextField()
     rank = DoubleField(null=True)
 
 
