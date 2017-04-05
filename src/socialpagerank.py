@@ -1,5 +1,15 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from cmath import log, phase
+from data import (get_user_rank, get_term_user_times,
+                  key_contains)
+
+
+def query_expansion(query: List[str], aa: Dict[Tuple[str, str], float]):
+    query_score = {}
+    for t in query:
+        neighbours = key_contains(aa.keys(), t)
+        for neighbour in neighbours:
+            query_score[neighbour] = rank(aa, neighbour)
 
 
 def simstep(accUser: str, unaccUser: str,
@@ -8,11 +18,11 @@ def simstep(accUser: str, unaccUser: str,
         if u not in unaccUser:
             stepValue = stepValue / phase(min(mat[accUser, u],
                                               mat[unaccUser, u] *
-                                              (-log(userRank(u)))))
+                                              (-log(get_user_rank(u)))))
     return stepValue
 
 
-def userRank(u) -> float:
+def rank(aa: Dict[Tuple[str, str], float], term: str, y=0.5) -> float:
     return 0.5
 
 
