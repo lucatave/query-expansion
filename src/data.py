@@ -1,10 +1,10 @@
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple, Set, List
 from os import environ
 from twitter import Api
 from peewee import OperationalError
 from models import (User, Document, Annotation, Tweet,
-                    AnnotationSimilarity, BaseModel, db)
-from nltk import work_tokenize, download
+                    AnnotationSimilarity as AAS, BaseModel, db)
+from nltk import word_tokenize, download, pos_tag
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from os.path import join, dirname
@@ -18,6 +18,7 @@ def print_info(tweet):
     print(tweet.user.screen_name)
     print(tweet.full_text or tweet.text)
     print(tweet.hashtags)
+    print(tweet.lang)
     print(tweet.contributors)
     print(tweet.in_reply_to_screen_name)
     print(tweet.user_mentions)
@@ -44,13 +45,12 @@ def get_term_user_times(term: str, user: str) -> int:
 
 
 def wait_for_db():
-    flag = True
-    while flag:
+    while True:
         try:
             db.connect()
-            flag = False
+            break
         except OperationalError:
-            flag = True
+            pass
     return db
 
 
@@ -60,22 +60,41 @@ def close_connection():
 
 def create_db():
     db.create_tables([User, Document, Annotation,
-                      Tweet, AnnotationSimilarity])
+                      Tweet, AAS])
 
 
-def normalize_data(text: str, user_r: str=None) -> Set[str]:
+def normalize_data(text: str,
+                   user_r: str=None) -> Set[str]:
     wnl = WordNetLemmatizer()
-    seng = stopwords.words("english")
-    sita = stopwords.words("italian")
-    if sita is None or seng is None:
-        download()
+    stop: Set[str] = stopwords.words("english")
+    tags: Set[str] = set()
+    token = pos_tag(word_tokenize(text))
+    name = ""
+    for word, pos in token:
+        word = wnl.lemmatize(word)
+        if word not in stop:
+            if pos == "NNP":
+                if name is "":
+                    name = word
+                else:
+                    name = name + " " + word
+            else:
+                tags.add(name)
+                name = ""
+                if pos == "NN":
+                    tags.add(word)
+
+    return tags
 
 
 def get_aa_subset(query: str) -> Dict[Tuple[str, str], float]:
-    normalize_data(query)
+    annotations = normalize_data(query)
     key_subset = []
+    annotations: List[Tuple[str, str]] = AAS.select(
+        AAS.annotation1, AAS.annotation2)
     for annotation in annotations:
         key_contains()
+
 
 def key_contains(keys, key, ret=[]):
     for k in keys:
@@ -113,12 +132,16 @@ def get_data():
 
     for friend_id in api.GetFriendIDs():
         User.get_or_create(id=friend_id)
-        friend_timeline = api.GetUserTimeline(user_id=friend_id, count=200)
+        friend_timeline = api.GetUserTimeline(user_id=friend_id,
+                                              lang="en",
+                                              count=200)
         friend = api.GetUser(user_id=friend_id)
         print("GETTING STATUSES OF ", friend.screen_name)
         for tweet in friend_timeline:
             save_data(tweet, friend, tweet.user)
         print("GETTING MENTIONS OF ", friend.screen_name)
-        for tweet in api.GetSearch(term=friend.screen_name, count=100):
+        for tweet in api.GetSearch(term=friend.screen_name,
+                                   lang="en",
+                                   count=100):
             if tweet.user.id != friend_id:
                 save_data(tweet, friend, tweet.user)
