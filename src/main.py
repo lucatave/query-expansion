@@ -1,6 +1,7 @@
 import argparse
 from data import (wait_for_db, create_db,
-                  get_aa_subset, get_data)
+                  get_aa_subset, get_data,
+                  close_connection)
 from socialpagerank import query_expansion
 
 if __name__ == '__main__':
@@ -17,17 +18,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print("CONNECTING TO DATABASE")
-    wait_for_db()
+    db = wait_for_db()
     print("CONNECTED TO DATABASE")
     if args.query:
         query = args.query
         query_expansion(query, get_aa_subset())
     if args.create:
-        create_db()
+        create_db(db)
     if args.update:
-        try:
-            print("RETRIEVING TWITTER DATA")
-            get_data()
-            print("FINISHED RETRIEVING TWITTER DATA")
-        except:
-            print("ERROR: An error occured while trying to get new data.")
+        print("RETRIEVING TWITTER DATA")
+        get_data()
+        print("FINISHED RETRIEVING TWITTER DATA")
+    close_connection()

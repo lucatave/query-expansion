@@ -1,10 +1,10 @@
-from typing import Dict, Tuple, Set, List
+from typing import Dict, Tuple, Set
 from os import environ
 from twitter import Api
 from peewee import OperationalError
 from models import (User, Document, Annotation, Tweet,
                     AnnotationSimilarity as AAS, BaseModel, db)
-from nltk import word_tokenize, download, pos_tag
+from nltk import word_tokenize, pos_tag
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from os.path import join, dirname
@@ -58,7 +58,7 @@ def close_connection():
     db.close()
 
 
-def create_db():
+def create_db(db):
     db.create_tables([User, Document, Annotation,
                       Tweet, AAS])
 
@@ -73,16 +73,17 @@ def normalize_data(text: str,
     for word, pos in token:
         word = wnl.lemmatize(word)
         if word not in stop:
-            if pos == "NNP":
-                if name is "":
-                    name = word
+            if word[0] is not "#":
+                if pos == "NNP":
+                    if name is "":
+                        name = word
+                    else:
+                        name = name + " " + word
                 else:
-                    name = name + " " + word
-            else:
-                tags.add(name)
-                name = ""
-                if pos == "NN":
-                    tags.add(word)
+                    tags.add(name)
+                    name = ""
+                    if pos == "NN":
+                        tags.add(word)
 
     return tags
 
@@ -105,18 +106,24 @@ def key_contains(keys, key, ret=[]):
     return ret
 
 
+def save_tweet(tag: str, doc_id: str):
+    Annotation.get_or_create(id=tag)
+    Tweet.get_or_create(id_document=doc_id, id_annotation=tag)
+
+
 def save_data(tweet, u_r, u_w):
     with db.atomic():
         User.get_or_create(id=u_w.id)
         if Document.select(id).where(Document.id == tweet.id).count() == 0:
             Document.get_or_create(id=tweet.id,
                                    user_w=u_w.id,
-                                   user_r=u_r.id)
+                                   user_r=u_r.id,
+                                   language=tweet.lang)
         hashtags = {hashtag.text for hashtag in tweet.hashtags}
         for hashtag in hashtags:
-            Annotation.get_or_create(id=hashtag)
-            Tweet.get_or_create(id_document=tweet.id,
-                                id_annotation=hashtag)
+            save_tweet(hashtag, tweet.id)
+        for tag in normalize_data(tweet.text):
+            save_tweet(tag, tweet.id)
 
 
 def get_data():
@@ -133,7 +140,6 @@ def get_data():
     for friend_id in api.GetFriendIDs():
         User.get_or_create(id=friend_id)
         friend_timeline = api.GetUserTimeline(user_id=friend_id,
-                                              lang="en",
                                               count=200)
         friend = api.GetUser(user_id=friend_id)
         print("GETTING STATUSES OF ", friend.screen_name)
