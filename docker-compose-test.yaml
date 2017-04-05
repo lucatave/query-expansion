@@ -1,13 +1,14 @@
 version: "3"
 
 services:
-  db_test:
+  db:
     image: postgres:9.6.2-alpine
+    ports:
+      - "$DB_PORT:5432"
     env_file: .env
   app:
     build: .
     links:
-      - db_test
+      - db
     working_dir: /app/src/
-    command: python data.py
     env_file: .env
