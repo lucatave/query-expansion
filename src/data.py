@@ -1,4 +1,6 @@
 from typing import Dict, Tuple, Set
+import urlmarker
+import re
 from os import environ
 from twitter import Api
 from peewee import OperationalError
@@ -65,6 +67,7 @@ def create_db(db):
 
 def normalize_data(text: str,
                    user_r: str=None) -> Set[str]:
+    text = remove_urls(text)
     wnl = WordNetLemmatizer()
     stop: Set[str] = stopwords.words("english")
     tags: Set[str] = set()
@@ -111,7 +114,14 @@ def save_tweet(tag: str, doc_id: str):
     Tweet.get_or_create(id_document=doc_id, id_annotation=tag)
 
 
+def remove_urls(text: str) -> str:
+    return re.sub(urlmarker.URL_REGEX, "", text)
+
+
+
 def save_data(tweet, u_r, u_w):
+    if tweet.lang is not "en":
+        return
     with db.atomic():
         User.get_or_create(id=u_w.id)
         if Document.select(id).where(Document.id == tweet.id).count() == 0:
