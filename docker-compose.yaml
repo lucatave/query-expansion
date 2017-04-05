@@ -8,3 +8,9 @@ services:
     volumes:
       - "$DB_VOLUME:/var/lib/postgresql/data"
     env_file: .env
+  app:
+    build: .
+    links:
+      - db
+    working_dir: /app/src/
+    env_file: .env
