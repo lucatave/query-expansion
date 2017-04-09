@@ -1,13 +1,12 @@
 from typing import Dict, Tuple, List
 from cmath import log, phase
-from data import (get_user_rank, get_term_user_times,
-                  key_contains)
+from data import (get_user_rank, get_neighbours)
 
 
 def query_expansion(query: List[str], aa: Dict[Tuple[str, str], float]):
     query_score = {}
     for t in query:
-        neighbours = key_contains(aa.keys(), t)
+        neighbours = get_neighbours(t)
         for neighbour in neighbours:
             query_score[neighbour] = rank(aa, neighbour)
 

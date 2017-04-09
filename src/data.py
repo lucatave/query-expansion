@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple, Set, List
 import urlmarker
 import re
 from os import environ
@@ -30,6 +30,20 @@ def print_info(tweet):
 def update_many(entity: BaseModel, data: Dict[str, float]):
     for (k, v) in data:
         entity.update(rank=data[k]).where(id=k)
+
+
+def get_neighbours(a1: str) -> Set[str]:
+    neighbour: Set[str] = set()
+    docs = Annotation.select(Annotation.tweets.id_document).where(
+        Annotation.id == a1)
+    for doc in docs:
+        candidates = Tweet.select(Tweet.id_annotation).where(
+            Tweet.id_document == doc)
+        for candidate in candidates:
+            if candidate is not a1:
+                neighbour.add(candidate)
+
+    return neighbour
 
 
 def get_user_rank(user_id: str) -> float:
@@ -116,7 +130,6 @@ def save_tweet(tag: str, doc_id: str):
 
 def remove_urls(text: str) -> str:
     return re.sub(urlmarker.URL_REGEX, "", text)
-
 
 
 def save_data(tweet, u_r, u_w):
