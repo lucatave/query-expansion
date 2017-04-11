@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Set, List
+from typing import Dict, Tuple, Set
 import urlmarker
 import re
 from os import environ
@@ -32,7 +32,7 @@ def update_many(entity: BaseModel, data: Dict[str, float]):
         entity.update(rank=data[k]).where(id=k)
 
 
-def get_neighbours(a1: str) -> Set[str]:
+def get_annotation_neighbours(a1: str) -> Set[str]:
     neighbour: Set[str] = set()
     docs = Annotation.select(Annotation.tweets.id_document).where(
         Annotation.id == a1)
@@ -103,15 +103,6 @@ def normalize_data(text: str,
                         tags.add(word)
 
     return tags
-
-
-def get_aa_subset(query: str) -> Dict[Tuple[str, str], float]:
-    annotations = normalize_data(query)
-    key_subset = []
-    annotations: List[Tuple[str, str]] = AAS.select(
-        AAS.annotation1, AAS.annotation2)
-    for annotation in annotations:
-        key_contains()
 
 
 def key_contains(keys, key, ret=[]):

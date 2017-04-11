@@ -1,7 +1,6 @@
 import argparse
 from data import (wait_for_db, create_db,
-                  get_aa_subset, get_data,
-                  close_connection)
+                  get_data, close_connection)
 from socialpagerank import query_expansion
 
 if __name__ == '__main__':
@@ -22,7 +21,7 @@ if __name__ == '__main__':
     print("CONNECTED TO DATABASE")
     if args.query:
         query = args.query
-        query_expansion(query, get_aa_subset())
+        query_expansion(query)
     if args.create:
         create_db(db)
     if args.update:

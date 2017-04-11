@@ -1,22 +1,21 @@
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 from cmath import log, phase
-from data import (get_user_rank, get_neighbours)
+from data import (get_user_rank, get_annotation_neighbours)
 
 
-def query_expansion(query: List[str], aa: Dict[Tuple[str, str], float]):
+def query_expansion(query: List[str]):
     query_score = {}
     for t in query:
-        neighbours = get_neighbours(t)
-        for neighbour in neighbours:
-            query_score[neighbour] = rank(aa, neighbour)
+        neighbours = get_annotation_neighbours(t)
 
 
-def simstep(accUser: str, unaccUser: str,
+def simstep(term1: str, term2: str,
+            accUser: Set[str], unaccUser: Set[str],
             mat: Dict[Tuple[str, str], int], stepValue: float) -> float:
     for u in accUser:
         if u not in unaccUser:
-            stepValue = stepValue / phase(min(mat[accUser, u],
-                                              mat[unaccUser, u] *
+            stepValue = stepValue / phase(min(mat[term1, u],
+                                              mat[term2, u] *
                                               (-log(get_user_rank(u)))))
     return stepValue
 
@@ -26,11 +25,11 @@ def rank(aa: Dict[Tuple[str, str], float], term: str, y=0.5) -> float:
 
 
 def sim(term1: str, term2: str,
-        uterm1: str, uterm2: str,
-        termusermat: Dict[Tuple[str, str], int]) -> float:
+        uterm1: Set[str], uterm2: Set[str],
+        matannotationuser: Dict[Tuple[str, str], int]) -> float:
 
-    simrank = simstep(uterm1, uterm2, termusermat, 1.0)
-    simrank = simstep(uterm2, uterm1, termusermat, simrank)
+    simrank = simstep(term1, term2, uterm1, uterm2, matannotationuser, 1.0)
+    simrank = simstep(term1, term2, uterm2, uterm1, matannotationuser, simrank)
     return simrank
 
 
