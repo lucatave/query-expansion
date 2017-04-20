@@ -1,4 +1,5 @@
 from typing import Dict, Tuple, Set
+from math import log10 as log
 import urlmarker
 import re
 from os import environ
@@ -11,9 +12,128 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from os.path import join, dirname
 from dotenv import load_dotenv
-
+from sys import maxsize
+from random import randint
+from sys import stderr
+from logging import (debug, info)
 dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
+
+
+def dict_k_add_item(d: Dict[str, float], k: int,
+                    key: str, val: float) -> Dict[str, float]:
+    if len(d.keys()) > k:
+        del d[get_min_key_by_val(d)]
+    d[key] = val
+    return d
+
+
+def query_from_dict_to_str(d: Dict[str, Set[str]]) -> str:
+    sep_or = " OR "
+    sep_and = " AND "
+    query = ""
+    fk = list(d.keys())[0]
+    query += fk
+    del d[fk]
+    for k in d:
+        l = list(d[k])
+        query += sep_and + k
+        n = len(l)
+        if n > 1:
+            query += sep_or + l[0]
+        for i in range(1, n):
+            query += sep_or + l[i]
+    return query
+
+
+def from_socialpagerank_to_db(spr: Tuple[Dict[str, float],
+                                         Dict[str, float],
+                                         Dict[str, float]]):
+    docs = spr[0]
+    for doc in docs.keys():
+        Document.update(rank=docs[doc]).where(id=doc)
+
+    users = spr[1]
+    for user in users.keys():
+        User.update(rank=users[user]).where(id=user)
+
+    annotations = spr[2]
+    for annotation in annotations.keys():
+        Annotation.update(rank=annotations[annotation]).where(id=annotation)
+
+
+def from_db_to_socialpagerank_matPU() -> Dict[str, Dict[str, int]]:
+    matPU: Dict[str, Dict[str, int]] = {}
+    query = BaseModel.raw("\
+    select tweet.id_document_id, document.user_w_id, count(*) \
+    from tweet,document \
+    where tweet.id_document_id = document.id \
+    group by(tweet.id_document_id, document.user_w_id)").tuples()
+    for (page, user, n) in query:
+        matPU[page] = {user: n}
+
+    return matPU
+
+
+def from_db_to_socialpagerank_matAP() -> Dict[str, Dict[str, int]]:
+    matAP: Dict[str, Dict[str, int]] = {}
+    query = BaseModel.raw("\
+    select tweet.id_annotation_id, tweet.id_document_id, count(*) \
+    from tweet \
+    group by (tweet.id_annotation_id, tweet.id_document_id)").tuples()
+    for (ann, page, n) in query:
+        matAP[ann] = {page: n}
+
+    return matAP
+
+
+def from_db_to_socialpagerank_matUA(tweets=Tweet.select()) ->Dict[str, Dict[str, int]]:
+    matUA: Dict[str, Dict[str, int]] = {}
+    query = BaseModel.raw("\
+    select document.user_w_id, tweet.id_annotation_id, count(*) \
+    from tweet,document \
+    where tweet.id_document_id = document.id \
+    group by(document.user_w_id, id_annotation_id)").tuples()
+    for (user, ann, n) in query:
+        if user in matUA.keys() and ann in matUA[user].keys():
+            matUA[user][ann] += 1
+        else:
+            matUA[user] = {ann: 1}
+
+    return matUA
+
+
+def get_min_key_by_val(d: Dict[str, float]) -> str:
+    _min = list(d.keys())[0]
+    for k in d:
+        if d[k] < d[_min]:
+            _min = k
+    return _min
+
+
+def get_min_max_mat_dict(m: Dict[str, Dict[str, int]],
+                         _min: int = maxsize,
+                         _max: int = 0,) -> Tuple[int, int]:
+    for k in m.keys():
+        for kk in m[k].keys():
+            if m[k][kk] < _min:
+                _min = m[k][kk]
+            elif m[k][kk] > _max:
+                _max = m[k][kk]
+    return (_min, _max)
+
+
+def randomize_matP(matPU: Dict[str, Dict[str, int]],
+                   matAP: Dict[str, Dict[str, int]],
+                   matUA: Dict[str, Dict[str, int]]) -> Dict[str, float]:
+    minmax = get_min_max_mat_dict(matPU)
+    minmax = get_min_max_mat_dict(matAP, minmax[0], minmax[1])
+    minmax = get_min_max_mat_dict(matUA, minmax[0], minmax[1])
+    matP: Dict[str, float] = {}
+    for doc in Document.select():
+        matP[doc.id] = randint(minmax[0], minmax[1])
+    return matP
+
 
 
 def print_info(tweet):
@@ -32,10 +152,22 @@ def update_many(entity: BaseModel, data: Dict[str, float]):
         entity.update(rank=data[k]).where(id=k)
 
 
+def tf_iuf(term: str) -> float:
+    n = int(Annotation.select().count())
+    n_term = int(Tweet.select(Tweet.id_annotation_id).where(
+        Tweet.id_annotation_id == term).count())
+
+    tf = float(n_term/n)
+    n = int(User.select().count())
+
+    iuf = log(n/n_term)
+
+    return float(tf * iuf)
+
+
 def get_annotation_neighbours(a1: str) -> Set[str]:
     neighbour: Set[str] = set()
-    docs = Annotation.select(Annotation.tweets.id_document).where(
-        Annotation.id == a1)
+    docs = Tweet.select(Tweet.id_document).where(Tweet.id_annotation_id == a1)
     for doc in docs:
         candidates = Tweet.select(Tweet.id_annotation).where(
             Tweet.id_document == doc)
@@ -46,8 +178,30 @@ def get_annotation_neighbours(a1: str) -> Set[str]:
     return neighbour
 
 
+def get_users_from_term(term: str):
+    return Document.select(Document.user_r_id).join(Tweet).where(
+        Tweet.id_annotation_id == term)
+
+
+def get_user_count_from_term(term: str) -> int:
+    return get_users_from_term(term).count()
+
+
+def get_term_count() -> int:
+    return int(Annotation.select().count())
+
+
+def get_terms():
+    return Annotation.select(Annotation.id)
+
+
 def get_user_rank(user_id: str) -> float:
     return float(User.select(User.rank).where(User.id == user_id))
+
+
+def get_annotation_rank(annotation_id: str) -> float:
+    return float(Annotation.select(Annotation.rank).where(
+        Annotation.id == annotation_id))
 
 
 def get_term_user_times(term: str, user: str) -> int:
@@ -79,11 +233,12 @@ def create_db(db):
                       Tweet, AAS])
 
 
-def normalize_data(text: str,
-                   user_r: str=None) -> Set[str]:
+def normalize_data(text: str) -> Set[str]:
     text = remove_urls(text)
     wnl = WordNetLemmatizer()
     stop: Set[str] = stopwords.words("english")
+    stop.append(stopwords.words("spanish"))
+    stop.append(stopwords.words("italian"))
     tags: Set[str] = set()
     token = pos_tag(word_tokenize(text))
     name = ""
@@ -101,6 +256,8 @@ def normalize_data(text: str,
                     name = ""
                     if pos == "NN":
                         tags.add(word)
+        else:
+            name = ""
 
     return tags
 
@@ -124,11 +281,9 @@ def remove_urls(text: str) -> str:
 
 
 def save_data(tweet, u_r, u_w):
-    if tweet.lang is not "en":
-        return
     with db.atomic():
         User.get_or_create(id=u_w.id)
-        if Document.select(id).where(Document.id == tweet.id).count() == 0:
+        if Document.select().where(Document.id == tweet.id).count() == 0:
             Document.get_or_create(id=tweet.id,
                                    user_w=u_w.id,
                                    user_r=u_r.id,
@@ -138,6 +293,11 @@ def save_data(tweet, u_r, u_w):
             save_tweet(hashtag, tweet.id)
         for tag in normalize_data(tweet.text):
             save_tweet(tag, tweet.id)
+
+
+def save_replies(replies, u_r):
+    for tweet in replies:
+        save_data(tweet, u_r, tweet.user)
 
 
 def get_data():
@@ -156,12 +316,14 @@ def get_data():
         friend_timeline = api.GetUserTimeline(user_id=friend_id,
                                               count=200)
         friend = api.GetUser(user_id=friend_id)
-        print("GETTING STATUSES OF ", friend.screen_name)
+        info("GETTING STATUSES OF " + friend.screen_name)
         for tweet in friend_timeline:
             save_data(tweet, friend, tweet.user)
-        print("GETTING MENTIONS OF ", friend.screen_name)
+            # save_replies(api.GetRetweets(tweet.id, count=100), friend_id)
+        info("GETTING MENTIONS OF " + friend.screen_name)
         for tweet in api.GetSearch(term=friend.screen_name,
                                    lang="en",
                                    count=100):
-            if tweet.user.id != friend_id:
+            if tweet.user.id is not friend_id:
                 save_data(tweet, friend, tweet.user)
+                # save_replies(api.GetRetweets(tweet.id, count=100), friend_id)

@@ -1,12 +1,24 @@
-from typing import Dict, Tuple, List, Set
+from typing import Dict, Tuple, Set
 from cmath import log, phase
-from data import (get_user_rank, get_annotation_neighbours)
+from data import (get_user_rank, get_annotation_neighbours,
+                  get_users_from_term, get_terms,
+                  get_term_count, dict_k_add_item,
+                  query_from_dict_to_str, tf_iuf,
+                  normalize_data)
 
 
-def query_expansion(query: List[str]):
-    query_score = {}
+def query_expansion(query: str, k: int = 1) -> str:
+    query = normalize_data(query)
+    query_score: Dict[str, Set[str]] = {}
+    candidates: Dict[str, float] = {}
     for t in query:
         neighbours = get_annotation_neighbours(t)
+        for neighbour in neighbours:
+            candidates = dict_k_add_item(candidates, k,
+                                         neighbour, rank(t, neighbour))
+        query_score[t] = set(candidates.keys())
+        candidates.clear()
+    return query_from_dict_to_str(query_score)
 
 
 def simstep(term1: str, term2: str,
@@ -20,13 +32,24 @@ def simstep(term1: str, term2: str,
     return stepValue
 
 
-def rank(aa: Dict[Tuple[str, str], float], term: str, y=0.5) -> float:
-    return 0.5
+def rank(query_term: str, term: str, y=0.5) -> float:
+    semantic_part = y * sim(query_term, term)
+    social_part = 0.0
+    for t in get_terms():
+        social_part += sim(t.id, term) * tf_iuf(t)
+    social_part = social_part * (1 - y) / get_term_count()
+    return semantic_part + social_part
 
 
-def sim(term1: str, term2: str,
-        uterm1: Set[str], uterm2: Set[str],
-        matannotationuser: Dict[Tuple[str, str], int]) -> float:
+def sim(term1: str, term2: str) -> float:
+    uterm1 = get_users_from_term(term1)
+    uterm2 = get_users_from_term(term2)
+
+    matannotationuser: Dict[Tuple[str, str], int] = {}
+    for u in uterm1:
+        matannotationuser[term1, u.id] = uterm1.count()
+    for u in uterm2:
+        matannotationuser[term2, u.id] = uterm2.count()
 
     simrank = simstep(term1, term2, uterm1, uterm2, matannotationuser, 1.0)
     simrank = simstep(term1, term2, uterm2, uterm1, matannotationuser, simrank)
@@ -40,7 +63,7 @@ def step_spr_trasposed(mat: Dict[str, Dict[str, int]],
         sum: float = 0
         for kk in mat[k]:
             sum = sum + mat[k][kk] * v[k]
-        matxv[kk] = sum
+        matxv[k] = sum
 
     return matxv
 
@@ -62,7 +85,8 @@ def step_spr_regular(mat: Dict[str, Dict[str, int]],
 def socialpagerank(matpageuser: Dict[str, Dict[str, int]],
                    matannotationpage: Dict[str, Dict[str, int]],
                    matuserannotation: Dict[str, Dict[str, int]],
-                   matp: Dict[str, float], maxIt: int) \
+                   matp: Dict[str, float],
+                   maxIt: int = 15) \
                    -> Tuple[Dict[str, float],
                             Dict[str, float],
                             Dict[str, float]]:
