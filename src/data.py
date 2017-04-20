@@ -28,15 +28,16 @@ def dict_k_add_item(d: Dict[str, float], k: int,
     return d
 
 
-def dictMat_x_dict(d1: Dict[str, Dict[str, int]],
+def dict_mat_x_dict(d1: Dict[str, Dict[str, int]],
                    d2: Dict[str, float],
                    result: Dict[str, float] = {}) -> Dict[str, float]:
     for r in d1.keys():
         sum = 0.0
-        if r in d2.keys():
-            for c in d1[r].keys():
-                sum = sum + d1[r][c] * d2[r]
-            result[r] = sum
+        for c in d2.keys():
+            if c in d1[r].keys():
+                sum = sum + d1[r][c] * d2[c]
+        result[r] = sum
+
     return result
 
 
@@ -44,8 +45,17 @@ def joined_dict_transpose(d: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, i
     ret: Dict[str, Dict[str, int]] = {}
     for k in d.keys():
         for kk in d[k].keys():
-            ret[kk] = {k: d[k][kk]}
+            # ret[kk] = {k: d[k][kk]}
+            ret = update_dict(ret, (kk, k, d[k][kk]))
     return ret
+
+
+def update_dict(d: Dict[str, Dict[str, int]], t: Tuple[str, str, int]) \
+    -> Dict[str, Dict[str, int]]:
+    dt = d.get(t[0], {})
+    dt[t[1]] = t[2]
+    d[t[0]] = dt
+    return d
 
 
 def query_from_dict_to_str(d: Dict[str, Set[str]]) -> str:
@@ -66,20 +76,19 @@ def query_from_dict_to_str(d: Dict[str, Set[str]]) -> str:
     return query
 
 
+def update_model(rows, d: Dict[str, float]):
+    for t in rows:
+        if t.id in d.keys():
+            t.rank = d[t.id]
+            t.save()
+
+
 def from_socialpagerank_to_db(spr: Tuple[Dict[str, float],
                                          Dict[str, float],
                                          Dict[str, float]]):
-    docs = spr[0]
-    for doc in docs.keys():
-        Document.update(rank=docs[doc]).where(id=doc)
-
-    users = spr[1]
-    for user in users.keys():
-        User.update(rank=users[user]).where(id=user)
-
-    annotations = spr[2]
-    for annotation in annotations.keys():
-        Annotation.update(rank=annotations[annotation]).where(id=annotation)
+    update_model(Document.select(), spr[0])
+    update_model(User.select(), spr[1])
+    update_model(Annotation.select(), spr[2])
 
 
 def from_db_to_socialpagerank_matPU() -> Dict[str, Dict[str, int]]:
@@ -90,7 +99,7 @@ def from_db_to_socialpagerank_matPU() -> Dict[str, Dict[str, int]]:
     where tweet.id_document_id = document.id \
     group by(tweet.id_document_id, document.user_w_id)").tuples()
     for (page, user, n) in query:
-        matPU[page] = {user: n}
+        matPU = update_dict(matPU, (page, user, n))
 
     return matPU
 
@@ -102,7 +111,7 @@ def from_db_to_socialpagerank_matAP() -> Dict[str, Dict[str, int]]:
     from tweet \
     group by (tweet.id_annotation_id, tweet.id_document_id)").tuples()
     for (ann, page, n) in query:
-        matAP[ann] = {page: n}
+        matUA = update_dict(matAP, (ann, page, n))
 
     return matAP
 
@@ -115,11 +124,7 @@ def from_db_to_socialpagerank_matUA() ->Dict[str, Dict[str, int]]:
     where tweet.id_document_id = document.id \
     group by(document.user_w_id, id_annotation_id)").tuples()
     for (user, ann, n) in query:
-        if user in matUA.keys() and ann in matUA[user].keys():
-            matUA[user][ann] += 1
-        else:
-            matUA[user] = {ann: 1}
-
+        matUA = update_dict(matUA, (user, ann, n))
     return matUA
 
 

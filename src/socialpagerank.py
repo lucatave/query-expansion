@@ -5,7 +5,7 @@ from data import (get_user_rank, get_annotation_neighbours,
                   get_term_count, dict_k_add_item,
                   query_from_dict_to_str, tf_iuf,
                   normalize_data, joined_dict_transpose,
-                  dictMat_x_dict)
+                  dict_mat_x_dict)
 
 
 def query_expansion(query: str, k: int = 1) -> str:
@@ -60,12 +60,12 @@ def sim(term1: str, term2: str) -> float:
 def step_spr_trasposed(mat: Dict[str, Dict[str, int]],
                        v: Dict[str, float],
                        matxv: Dict[str, float]) -> Dict[str, float]:
-    return dictMat_x_dict(joined_dict_transpose(mat), v, matxv)
+    return dict_mat_x_dict(joined_dict_transpose(mat), v, matxv)
 
 
 def step_spr_regular(mat: Dict[str, Dict[str, int]],
                      v: Dict[str, float]) -> Dict[str, float]:
-    return dictMat_x_dict(mat, v)
+    return dict_mat_x_dict(mat, v)
 
 
 def socialpagerank(matpageuser: Dict[str, Dict[str, int]],
@@ -76,7 +76,6 @@ def socialpagerank(matpageuser: Dict[str, Dict[str, int]],
                    -> Tuple[Dict[str, float],
                             Dict[str, float],
                             Dict[str, float]]:
-
     matu: Dict[str, float] = {}
     mata: Dict[str, float] = {}
 
