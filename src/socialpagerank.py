@@ -4,7 +4,8 @@ from data import (get_user_rank, get_annotation_neighbours,
                   get_users_from_term, get_terms,
                   get_term_count, dict_k_add_item,
                   query_from_dict_to_str, tf_iuf,
-                  normalize_data)
+                  normalize_data, joined_dict_transpose,
+                  dictMat_x_dict)
 
 
 def query_expansion(query: str, k: int = 1) -> str:
@@ -59,27 +60,12 @@ def sim(term1: str, term2: str) -> float:
 def step_spr_trasposed(mat: Dict[str, Dict[str, int]],
                        v: Dict[str, float],
                        matxv: Dict[str, float]) -> Dict[str, float]:
-    for k in mat.keys():
-        sum: float = 0
-        for kk in mat[k]:
-            sum = sum + mat[k][kk] * v[k]
-        matxv[k] = sum
-
-    return matxv
+    return dictMat_x_dict(joined_dict_transpose(mat), v, matxv)
 
 
 def step_spr_regular(mat: Dict[str, Dict[str, int]],
                      v: Dict[str, float]) -> Dict[str, float]:
-    matxv: Dict[str, float] = {}
-    for k in mat.keys():
-        for kk in mat[k]:
-            val = mat[k][kk] * v[kk]
-            if kk not in matxv:
-                matxv[k] = val
-            else:
-                matxv[k] += val
-
-    return matxv
+    return dictMat_x_dict(mat, v)
 
 
 def socialpagerank(matpageuser: Dict[str, Dict[str, int]],

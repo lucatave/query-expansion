@@ -28,6 +28,26 @@ def dict_k_add_item(d: Dict[str, float], k: int,
     return d
 
 
+def dictMat_x_dict(d1: Dict[str, Dict[str, int]],
+                   d2: Dict[str, float],
+                   result: Dict[str, float] = {}) -> Dict[str, float]:
+    for r in d1.keys():
+        sum = 0.0
+        if r in d2.keys():
+            for c in d1[r].keys():
+                sum = sum + d1[r][c] * d2[r]
+            result[r] = sum
+    return result
+
+
+def joined_dict_transpose(d: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, int]]:
+    ret: Dict[str, Dict[str, int]] = {}
+    for k in d.keys():
+        for kk in d[k].keys():
+            ret[kk] = {k: d[k][kk]}
+    return ret
+
+
 def query_from_dict_to_str(d: Dict[str, Set[str]]) -> str:
     sep_or = " OR "
     sep_and = " AND "
@@ -87,7 +107,7 @@ def from_db_to_socialpagerank_matAP() -> Dict[str, Dict[str, int]]:
     return matAP
 
 
-def from_db_to_socialpagerank_matUA(tweets=Tweet.select()) ->Dict[str, Dict[str, int]]:
+def from_db_to_socialpagerank_matUA() ->Dict[str, Dict[str, int]]:
     matUA: Dict[str, Dict[str, int]] = {}
     query = BaseModel.raw("\
     select document.user_w_id, tweet.id_annotation_id, count(*) \
