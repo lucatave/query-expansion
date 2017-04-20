@@ -46,8 +46,8 @@ if __name__ == '__main__':
         matP = randomize_matP(matPU, matAP, matUA)
         from_socialpagerank_to_db(socialpagerank(matPU, matAP, matUA, matP))
     if args.query:
-        query = args.query
+        query = str(args.query)
         exp_query = query_expansion(query)
-        info("ORIGINAL QUERY:\n", query)
-        info("EXPANDED QUERY:\n",)
+        print("ORIGINAL QUERY:\n", query)
+        print("EXPANDED QUERY:\n", exp_query)
     close_connection()
