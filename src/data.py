@@ -33,8 +33,7 @@ def dict_mat_x_dict(d1: Dict[str, Dict[str, int]],
                    result: Dict[str, float] = {}) -> Dict[str, float]:
     for r in d1.keys():
         sum = 0.0
-        for c in d2.keys():
-            if c in d1[r].keys():
+        for c in d1[r].keys():
                 sum = sum + d1[r][c] * d2[c]
         result[r] = sum
 
