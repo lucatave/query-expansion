@@ -8,17 +8,20 @@ from data import (get_user_rank, get_annotation_neighbours,
                   dict_mat_x_dict)
 
 
-def query_expansion(query: str, k: int = 1) -> str:
-    query = normalize_data(query)
+def query_expansion(query: str, k: int = 50) -> str:
+    query_set = normalize_data(query)
+    print("query_set", query_set)
     query_score: Dict[str, Set[str]] = {}
     candidates: Dict[str, float] = {}
-    for t in query:
+    for t in query_set:
         neighbours = get_annotation_neighbours(t)
         for neighbour in neighbours:
-            candidates = dict_k_add_item(candidates, k,
-                                         neighbour, rank(t, neighbour))
+            if neighbour not in candidates:
+                candidates = dict_k_add_item(candidates, k,
+                                             neighbour, rank(t, neighbour))
         query_score[t] = set(candidates.keys())
         candidates.clear()
+    print("query_score: ", query_score)
     return query_from_dict_to_str(query_score)
 
 
@@ -29,7 +32,7 @@ def simstep(term1: str, term2: str,
         if u not in unaccUser:
             stepValue = stepValue / phase(min(mat[term1, u],
                                               mat[term2, u] *
-                                              (-log(get_user_rank(u)))))
+                                              phase(-log(get_user_rank(u)))))
     return stepValue
 
 
@@ -44,16 +47,26 @@ def rank(query_term: str, term: str, y=0.5) -> float:
 
 def sim(term1: str, term2: str) -> float:
     uterm1 = get_users_from_term(term1)
+    u1 = set()
     uterm2 = get_users_from_term(term2)
+    u2 = set()
 
     matannotationuser: Dict[Tuple[str, str], int] = {}
-    for u in uterm1:
-        matannotationuser[term1, u.id] = uterm1.count()
-    for u in uterm2:
-        matannotationuser[term2, u.id] = uterm2.count()
+    for (u, c) in uterm1:
+        matannotationuser[term1, u] = c
+        u1.add(u)
+    for (u, c) in uterm2:
+        matannotationuser[term2, u] = c
+        u2.add(u)
+    for u in u1:
+        if u not in u2:
+            matannotationuser[term2, u] = 0
+    for u in u2:
+        if u not in u1:
+            matannotationuser[term1, u] = 0
 
-    simrank = simstep(term1, term2, uterm1, uterm2, matannotationuser, 1.0)
-    simrank = simstep(term1, term2, uterm2, uterm1, matannotationuser, simrank)
+    simrank = simstep(term1, term2, u1, u2, matannotationuser, 1.0)
+    simrank = simstep(term1, term2, u2, u1, matannotationuser, simrank)
     return simrank
 
 

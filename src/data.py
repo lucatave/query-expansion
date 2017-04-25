@@ -36,7 +36,6 @@ def dict_mat_x_dict(d1: Dict[str, Dict[str, int]],
         for c in d1[r].keys():
                 sum = sum + d1[r][c] * d2[c]
         result[r] = sum
-
     return result
 
 
@@ -64,14 +63,10 @@ def query_from_dict_to_str(d: Dict[str, Set[str]]) -> str:
     fk = list(d.keys())[0]
     query += fk
     del d[fk]
-    for k in d:
-        l = list(d[k])
-        query += sep_and + k
-        n = len(l)
-        if n > 1:
-            query += sep_or + l[0]
-        for i in range(1, n):
-            query += sep_or + l[i]
+    for k in d.keys():
+        query += sep_or
+        for exp in d[k]:
+            query += sep_and + exp
     return query
 
 
@@ -159,7 +154,6 @@ def randomize_matP(matPU: Dict[str, Dict[str, int]],
     return matP
 
 
-
 def print_info(tweet):
     print(tweet.user.screen_name)
     print(tweet.full_text or tweet.text)
@@ -191,20 +185,25 @@ def tf_iuf(term: str) -> float:
 
 def get_annotation_neighbours(a1: str) -> Set[str]:
     neighbour: Set[str] = set()
-    docs = Tweet.select(Tweet.id_document).where(Tweet.id_annotation_id == a1)
-    for doc in docs:
-        candidates = Tweet.select(Tweet.id_annotation).where(
-            Tweet.id_document == doc)
-        for candidate in candidates:
-            if candidate is not a1:
-                neighbour.add(candidate)
-
+    query = BaseModel.raw("\
+    select t2.id_annotation_id \
+    from tweet as t1, tweet as t2 \
+    where t1.id_annotation_id = %s and \
+    t2.id_document_id = t1.id_document_id \
+    group by t2.id_annotation_id", a1).tuples()
+    for (ann) in query:
+        if ann is not a1:
+            neighbour.add(ann)
     return neighbour
 
 
 def get_users_from_term(term: str):
-    return Document.select(Document.user_r_id).join(Tweet).where(
-        Tweet.id_annotation_id == term)
+    return BaseModel.raw(" \
+    select document.user_r_id, count(*) \
+    from document, tweet \
+    where tweet.id_document_id = document.id \
+    and tweet.id_annotation_id = %s \
+    group by document.user_r_id", term).tuples()
 
 
 def get_user_count_from_term(term: str) -> int:
@@ -220,7 +219,7 @@ def get_terms():
 
 
 def get_user_rank(user_id: str) -> float:
-    return float(User.select(User.rank).where(User.id == user_id))
+    return float(User.select(User.rank).where(User.id == user_id).get().rank)
 
 
 def get_annotation_rank(annotation_id: str) -> float:
@@ -260,9 +259,9 @@ def create_db(db):
 def normalize_data(text: str) -> Set[str]:
     text = remove_urls(text)
     wnl = WordNetLemmatizer()
-    stop: Set[str] = stopwords.words("english")
-    stop.append(stopwords.words("spanish"))
-    stop.append(stopwords.words("italian"))
+    stop: Set[str] = set(stopwords.words("english") +
+                         stopwords.words("spanish") +
+                         stopwords.words("italian"))
     tags: Set[str] = set()
     token = pos_tag(word_tokenize(text))
     name = ""
@@ -276,13 +275,13 @@ def normalize_data(text: str) -> Set[str]:
                     else:
                         name = name + " " + word
                 else:
-                    tags.add(name)
+                    if name is not "":
+                        tags.add(name)
                     name = ""
                     if pos == "NN":
                         tags.add(word)
         else:
             name = ""
-
     return tags
 
 
