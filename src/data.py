@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from sys import maxsize
 from random import randint
 from sys import stderr
+from functools import lru_cache
 from logging import (debug, info)
 dotenv_path = join(dirname(__file__), '../.env')
 load_dotenv(dotenv_path)
@@ -170,44 +171,45 @@ def update_many(entity: BaseModel, data: Dict[str, float]):
         entity.update(rank=data[k]).where(id=k)
 
 
-def tf_iuf(term: str) -> float:
-    n = int(Annotation.select().count())
+@lru_cache(maxsize=None)
+def tf_iuf(na: int, nu: int, term: str) -> float:
+    # n = int(Annotation.select().count())
     n_term = int(Tweet.select(Tweet.id_annotation_id).where(
         Tweet.id_annotation_id == term).count())
 
-    tf = float(n_term/n)
-    n = int(User.select().count())
+    tf = float(n_term/na)
+    # n = int(User.select().count())
 
-    iuf = log(n/n_term)
+    iuf = log(nu/n_term)
 
     return float(tf * iuf)
 
 
+@lru_cache(maxsize=None)
 def get_annotation_neighbours(a1: str) -> Set[str]:
-    neighbour: Set[str] = set()
     query = BaseModel.raw("\
     select t2.id_annotation_id \
     from tweet as t1, tweet as t2 \
     where t1.id_annotation_id = %s and \
-    t2.id_document_id = t1.id_document_id \
-    group by t2.id_annotation_id", a1).tuples()
-    for (ann) in query:
-        if ann is not a1:
-            neighbour.add(ann)
-    return neighbour
+    t2.id_document_id = t1.id_document_id and \
+    t2.id_annotation_id <> %s \
+    group by t2.id_annotation_id", a1, a1).tuples()
+    return set(query)
 
 
+@lru_cache(maxsize=None)
 def get_users_from_term(term: str):
     return BaseModel.raw(" \
-    select document.user_r_id, count(*) \
-    from document, tweet \
+    select document.user_r_id, public.user.rank, count(*) \
+    from document, tweet, public.user\
     where tweet.id_document_id = document.id \
+    and document.user_r_id = public.user.id \
     and tweet.id_annotation_id = %s \
-    group by document.user_r_id", term).tuples()
+    group by document.user_r_id, public.user.rank", term).tuples()
 
 
-def get_user_count_from_term(term: str) -> int:
-    return get_users_from_term(term).count()
+def get_user_count() -> int:
+    return int(User.select().count())
 
 
 def get_term_count() -> int:
@@ -216,10 +218,6 @@ def get_term_count() -> int:
 
 def get_terms():
     return Annotation.select(Annotation.id)
-
-
-def get_user_rank(user_id: str) -> float:
-    return float(User.select(User.rank).where(User.id == user_id).get().rank)
 
 
 def get_annotation_rank(annotation_id: str) -> float:

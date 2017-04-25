@@ -1,15 +1,18 @@
 from typing import Dict, Tuple, Set
 from cmath import log, phase
-from data import (get_user_rank, get_annotation_neighbours,
+from functools import lru_cache
+from data import (get_annotation_neighbours,
                   get_users_from_term, get_terms,
                   get_term_count, dict_k_add_item,
                   query_from_dict_to_str, tf_iuf,
                   normalize_data, joined_dict_transpose,
-                  dict_mat_x_dict)
+                  dict_mat_x_dict, get_user_count)
 
 
 def query_expansion(query: str, k: int = 50) -> str:
     query_set = normalize_data(query)
+    na = int(get_term_count())
+    nu = int(get_user_count())
     print("query_set", query_set)
     query_score: Dict[str, Set[str]] = {}
     candidates: Dict[str, float] = {}
@@ -18,7 +21,8 @@ def query_expansion(query: str, k: int = 50) -> str:
         for neighbour in neighbours:
             if neighbour not in candidates:
                 candidates = dict_k_add_item(candidates, k,
-                                             neighbour, rank(t, neighbour))
+                                             neighbour, rank(na, nu,
+                                                             t, neighbour))
         query_score[t] = set(candidates.keys())
         candidates.clear()
     print("query_score: ", query_score)
@@ -28,23 +32,25 @@ def query_expansion(query: str, k: int = 50) -> str:
 def simstep(term1: str, term2: str,
             accUser: Set[str], unaccUser: Set[str],
             mat: Dict[Tuple[str, str], int], stepValue: float) -> float:
-    for u in accUser:
+    for (u, r) in accUser:
         if u not in unaccUser:
             stepValue = stepValue / phase(min(mat[term1, u],
                                               mat[term2, u] *
-                                              phase(-log(get_user_rank(u)))))
+                                              phase(-log(r))))
     return stepValue
 
 
-def rank(query_term: str, term: str, y=0.5) -> float:
+@lru_cache(maxsize=None)
+def rank(na: int, nu: int, query_term: str, term: str, y=0.5) -> float:
     semantic_part = y * sim(query_term, term)
     social_part = 0.0
     for t in get_terms():
-        social_part += sim(t.id, term) * tf_iuf(t)
-    social_part = social_part * (1 - y) / get_term_count()
+        social_part += sim(t.id, term) * tf_iuf(na, nu, t)
+    social_part = social_part * (1 - y) / na
     return semantic_part + social_part
 
 
+@lru_cache(maxsize=None)
 def sim(term1: str, term2: str) -> float:
     uterm1 = get_users_from_term(term1)
     u1 = set()
@@ -52,17 +58,17 @@ def sim(term1: str, term2: str) -> float:
     u2 = set()
 
     matannotationuser: Dict[Tuple[str, str], int] = {}
-    for (u, c) in uterm1:
+    for (u, r, c) in uterm1:
         matannotationuser[term1, u] = c
-        u1.add(u)
-    for (u, c) in uterm2:
+        u1.add((u, r))
+    for (u, r, c) in uterm2:
         matannotationuser[term2, u] = c
-        u2.add(u)
-    for u in u1:
-        if u not in u2:
+        u2.add((u, r))
+    for (u, r) in u1:
+        if (u, r) not in u2:
             matannotationuser[term2, u] = 0
-    for u in u2:
-        if u not in u1:
+    for (u, r) in u2:
+        if (u, r) not in u1:
             matannotationuser[term1, u] = 0
 
     simrank = simstep(term1, term2, u1, u2, matannotationuser, 1.0)
