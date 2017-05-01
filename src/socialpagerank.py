@@ -9,7 +9,7 @@ from data import (get_annotation_neighbours,
                   dict_mat_x_dict, get_user_count)
 
 
-def query_expansion(query: str, k: int = 50) -> str:
+def query_expansion(query: str, k: int = 4) -> str:
     query_set = normalize_data(query)
     na = int(get_term_count())
     nu = int(get_user_count())
@@ -17,16 +17,17 @@ def query_expansion(query: str, k: int = 50) -> str:
     query_score: Dict[str, Set[str]] = {}
     candidates: Dict[str, float] = {}
     for t in query_set:
+        print(t)
         neighbours = get_annotation_neighbours(t)
         for neighbour in neighbours:
             if neighbour not in candidates:
                 candidates = dict_k_add_item(candidates, k,
                                              neighbour, rank(na, nu,
                                                              t, neighbour))
+        print(candidates.keys())
         query_score[t] = set(candidates.keys())
         candidates.clear()
-    print("query_score: ", query_score)
-    return query_from_dict_to_str(query_score)
+    return query_score
 
 
 def simstep(term1: str, term2: str,
@@ -91,7 +92,7 @@ def socialpagerank(matpageuser: Dict[str, Dict[str, int]],
                    matannotationpage: Dict[str, Dict[str, int]],
                    matuserannotation: Dict[str, Dict[str, int]],
                    matp: Dict[str, float],
-                   maxIt: int = 15) \
+                   maxIt=100) \
                    -> Tuple[Dict[str, float],
                             Dict[str, float],
                             Dict[str, float]]:

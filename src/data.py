@@ -44,7 +44,6 @@ def joined_dict_transpose(d: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, i
     ret: Dict[str, Dict[str, int]] = {}
     for k in d.keys():
         for kk in d[k].keys():
-            # ret[kk] = {k: d[k][kk]}
             ret = update_dict(ret, (kk, k, d[k][kk]))
     return ret
 
@@ -207,24 +206,24 @@ def get_users_from_term(term: str):
     and tweet.id_annotation_id = %s \
     group by document.user_r_id, public.user.rank", term).tuples()
 
-
+@lru_cache(maxsize=None)
 def get_user_count() -> int:
     return int(User.select().count())
 
-
+@lru_cache(maxsize=None)
 def get_term_count() -> int:
     return int(Annotation.select().count())
 
-
+@lru_cache(maxsize=None)
 def get_terms():
     return Annotation.select(Annotation.id)
 
-
+@lru_cache(maxsize=None)
 def get_annotation_rank(annotation_id: str) -> float:
     return float(Annotation.select(Annotation.rank).where(
         Annotation.id == annotation_id))
 
-
+@lru_cache(maxsize=None)
 def get_term_user_times(term: str, user: str) -> int:
     docs = Document(Tweet.select(Tweet.id_document).where(
         Tweet.id_annotation == term))
